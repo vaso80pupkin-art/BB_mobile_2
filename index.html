@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="screen-orientation" content="landscape">
+<meta name="x5-orientation" content="landscape">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Bloodborne: Central Yharnam (Expanded Vertical Slice)</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #040406;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: #d8cfc0;
+    touch-action: none;
+  }
+  #game-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    z-index: 1;
+  }
+
+  /* Portrait Lock Overlay */
+  #portrait-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, #141016 0%, #050507 100%);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    border: 2px solid #4a3b2c;
+  }
+  @media screen and (orientation: portrait) {
+    #portrait-warning { display: flex; }
+  }
+  .phone-rotate-icon {
+    width: 54px;
+    height: 92px;
+    border: 3px solid #c5a880;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    animation: rotatePhone 2.2s ease-in-out infinite;
+    position: relative;
+  }
+  .phone-rotate-icon::after {
+    content: '';
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 3px;
+    background: #c5a880;
+  }
+  @keyframes rotatePhone {
+    0%, 20% { transform: rotate(0deg); }
+    50%, 80% { transform: rotate(-90deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  /* Start Screen */
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(16,12,18,0.88) 0%, rgba(4,4,6,0.98) 100%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+  }
+  #start-screen h1 {
+    font-size: clamp(28px, 5vw, 54px);
+    letter-spacing: 7px;
+    text-transform: uppercase;
+    color: #e5dccb;
+    text-shadow: 0 0 28px rgba(180, 20, 30, 0.85);
+    margin-bottom: 8px;
+  }
+  #start-screen p {
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: #9e917d;
+    margin-bottom: 26px;
+  }
+  .btn-gothic {
+    background: linear-gradient(180deg, #2a1d1d 0%, #140c0c 100%);
+    border: 1px solid #8a6d4b;
+    color: #efe5d5;
+    padding: 14px 36px;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.8), inset 0 0 12px rgba(160, 30, 30, 0.35);
+    transition: transform 0.1s, border-color 0.2s;
+  }
+  .btn-gothic:active {
+    transform: translateY(2px) scale(0.98);
+    border-color: #d4af37;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    inset: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+    z-index: 10;
+    pointer-events: none;
+    display: none;
+  }
+  .bars-top-left {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    width: 235px;
+  }
+  .bar-wrap {
+    width: 100%;
+    height: 11px;
+    background: rgba(10, 10, 12, 0.88);
+    border: 1px solid #594a38;
+    margin-bottom: 5px;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.85);
+  }
+  .bar-rally {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: #d97724;
+    width: 100%;
+    transition: width 0.15s linear;
+  }
+  .bar-hp {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: linear-gradient(90deg, #5c0a12 0%, #a81422 100%);
+    width: 100%;
+    transition: width 0.08s linear;
+  }
+  .bar-stamina {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: linear-gradient(90deg, #1b4d2e 0%, #348a54 100%);
+    width: 100%;
+  }
+  .resources-row {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #d6c8b4;
+    text-shadow: 1px 1px 2px #000;
+    margin-top: 3px;
+  }
+  .res-badge span { color: #e64848; font-weight: bold; }
+  .res-badge.bullets span { color: #c9b99a; }
+  .res-badge.echoes span { color: #e5c687; }
+
+  /* Location Title Toast */
+  #location-toast {
+    position: absolute;
+    top: 18%;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+  #location-toast h2 {
+    font-size: clamp(20px, 3.5vw, 34px);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: #e6dac6;
+    text-shadow: 0 2px 12px #000;
+    border-bottom: 1px solid rgba(197, 168, 128, 0.5);
+    padding-bottom: 6px;
+  }
+
+  /* Context Action Prompt */
+  #interact-prompt {
+    position: absolute;
+    bottom: 26%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(12, 10, 12, 0.9);
+    border: 1px solid #9c7e54;
+    padding: 9px 22px;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    color: #f0e4d0;
+    display: none;
+    pointer-events: auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.9);
+  }
+  #interact-prompt:active {
+    background: #2b1d1a;
+    border-color: #f0c265;
+  }
+
+  /* Boss Bar */
+  #boss-hud {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    max-width: 440px;
+    display: none;
+    text-align: center;
+  }
+  #boss-name {
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #e3d5be;
+    text-shadow: 0 2px 4px #000;
+    margin-bottom: 4px;
+  }
+  .boss-bar-wrap {
+    width: 100%;
+    height: 11px;
+    background: rgba(10, 8, 10, 0.92);
+    border: 1px solid #755e43;
+    box-shadow: 0 0 15px rgba(0,0,0,0.9);
+  }
+  #boss-hp-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #4f070e 0%, #9c111e 100%);
+    transition: width 0.1s linear;
+  }
+
+  /* Top Right Info */
+  .top-right-info {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    text-align: right;
+    font-size: 11px;
+    color: #a89984;
+    text-shadow: 1px 1px 2px #000;
+  }
+  #weapon-mode-label {
+    color: #e5c687;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  #btn-music {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(197,168,128,0.6);
+    background: rgba(14,10,12,0.7);
+    color: #e5c687;
+    font-size: 18px;
+    z-index: 40;
+    pointer-events: auto;
+  }
+  #btn-music.off { opacity: 0.45; text-decoration: line-through; }
+  #load-status { margin-top: 16px; font-size: 12px; letter-spacing: 1px; color: #7c705f; max-width: 520px; }
+
+  /* Start screen with key art (B.jpeg next to the html) */
+  #start-screen {
+    flex-direction: row;
+    gap: clamp(20px, 5vw, 64px);
+    overflow: hidden;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  #start-bg {
+    position: absolute;
+    inset: -30px;
+    background: url('B.jpeg') center / cover no-repeat;
+    filter: blur(22px) brightness(0.32) saturate(0.8);
+    z-index: -1;
+  }
+  #start-poster {
+    height: min(92vh, 560px);
+    max-width: 44vw;
+    aspect-ratio: 736 / 1104;
+    object-fit: cover;
+    border: 1px solid #4a3b2c;
+    box-shadow: 0 0 40px rgba(0,0,0,0.9), 0 0 30px rgba(150,20,30,0.35);
+  }
+  #start-info { display: flex; flex-direction: column; align-items: center; max-width: 46vw; }
+  .btn-gothic:disabled { opacity: 0.5; cursor: default; }
+  #music-status { margin-top: 4px; font-size: 12px; letter-spacing: 1px; color: #7c705f; }
+
+  /* Touch Controls */
+  #touch-joystick-zone {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    width: 136px;
+    height: 136px;
+    pointer-events: auto;
+  }
+  #joystick-base {
+    width: 112px;
+    height: 112px;
+    border-radius: 50%;
+    border: 2px solid rgba(197, 168, 128, 0.35);
+    background: radial-gradient(circle, rgba(20,16,20,0.35) 0%, rgba(10,8,10,0.6) 100%);
+    position: relative;
+    margin: 12px;
+  }
+  #joystick-knob {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #8c7355, #3b2d20);
+    border: 1px solid #d4b895;
+    position: absolute;
+    top: 33px;
+    left: 33px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+  }
+
+  #camera-swipe-zone {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 55%;
+    height: 60%;
+    pointer-events: auto;
+  }
+
+  .action-buttons {
+    position: absolute;
+    bottom: 14px;
+    right: 16px;
+    width: 230px;
+    height: 170px;
+    pointer-events: auto;
+  }
+  .touch-btn {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, rgba(45, 34, 34, 0.86), rgba(16, 12, 14, 0.94));
+    border: 1.5px solid #8c7250;
+    color: #efe4d2;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.85);
+    transition: transform 0.06s, border-color 0.1s;
+  }
+  .touch-btn:active, .touch-btn.active {
+    transform: scale(0.91) translateY(2px);
+    border-color: #e6b85c;
+    background: radial-gradient(circle at 35% 35%, rgba(110, 28, 34, 0.9), rgba(35, 10, 14, 0.95));
+  }
+  #btn-attack { width: 70px; height: 70px; right: 6px; bottom: 8px; border-color: #b54545; font-size: 13px; }
+  #btn-dodge { width: 54px; height: 54px; right: 86px; bottom: 8px; }
+  #btn-gun { width: 54px; height: 54px; right: 82px; bottom: 72px; border-color: #7d92a6; }
+  #btn-trick { width: 50px; height: 50px; right: 12px; bottom: 88px; border-color: #c49a45; }
+  #btn-heal { width: 46px; height: 46px; right: 148px; bottom: 12px; border-color: #a62633; }
+  #btn-lock { width: 46px; height: 46px; right: 144px; bottom: 72px; }
+  #btn-lock.locked { border-color: #f0c265; box-shadow: 0 0 12px rgba(240, 194, 101, 0.6); }
+
+  /* Banner */
+  #banner-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    z-index: 50;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  #banner-text {
+    font-size: clamp(30px, 6vw, 62px);
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+    text-shadow: 0 0 25px #000;
+  }
+  .banner-died { color: #9e1522; }
+  .banner-victory { color: #d6b87c; }
+</style>
+</head>
+<body>
+
+<div id="portrait-warning">
+  <div class="phone-rotate-icon"></div>
+  <h2 style="letter-spacing:3px; text-transform:uppercase; margin-bottom:10px; color:#e6d8c3;">Поверните устройство</h2>
+  <p style="color:#9c8e7a; font-size:14px;">Охота в Ярнаме требует горизонтального экрана</p>
+</div>
+
+<div id="start-screen">
+  <div id="start-bg"></div>
+  <img id="start-poster" src="B.jpeg" alt="" onerror="this.style.display='none';document.getElementById('start-bg').style.display='none'">
+  <div id="start-info">
+    <h1>BLOODBORNE</h1>
+    <p>Центральный Ярнам — Площадь костра, Шорткаты и Большой Мост</p>
+    <button class="btn-gothic" id="btn-start">Пробудиться в Ярнаме</button>
+    <div id="load-status">Модель охотника: загрузка…</div>
+    <div id="music-status">Музыка: загрузка…</div>
+  </div>
+</div>
+
+<canvas id="game-canvas"></canvas>
+
+<div id="hud">
+  <button id="btn-music" title="Музыка">♪</button>
+  <div class="bars-top-left">
+    <div class="bar-wrap">
+      <div class="bar-rally" id="bar-rally"></div>
+      <div class="bar-hp" id="bar-hp"></div>
+    </div>
+    <div class="bar-wrap" style="height:8px; width:82%;">
+      <div class="bar-stamina" id="bar-stamina"></div>
+    </div>
+    <div class="resources-row">
+      <div class="res-badge">Пузырьки: <span id="vials-count">6</span></div>
+      <div class="res-badge bullets">Пули: <span id="bullets-count">12</span></div>
+      <div class="res-badge echoes">Отголоски: <span id="echoes-count">0</span></div>
+    </div>
+  </div>
+
+  <div class="top-right-info">
+    <div>Оружие: <span id="weapon-mode-label">Пила-топор (Сложен)</span></div>
+    <div id="zone-indicator" style="margin-top:3px; color:#c5a880;">Двор Фонаря Центрального Ярнама</div>
+  </div>
+
+  <div id="location-toast"><h2 id="location-toast-text">ЦЕНТРАЛЬНЫЙ ЯРНАМ</h2></div>
+
+  <button id="interact-prompt">Взаимодействовать</button>
+
+  <div id="boss-hud">
+    <div id="boss-name">Церковное Чудовище</div>
+    <div class="boss-bar-wrap">
+      <div id="boss-hp-fill"></div>
+    </div>
+  </div>
+
+  <div id="camera-swipe-zone"></div>
+
+  <div id="touch-joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-knob"></div>
+    </div>
+  </div>
+
+  <div class="action-buttons">
+    <button class="touch-btn" id="btn-attack">УДАР<br><small>R1</small></button>
+    <button class="touch-btn" id="btn-dodge">ОТСКОК</button>
+    <button class="touch-btn" id="btn-gun">ВЫСТРЕЛ<br><small>L2</small></button>
+    <button class="touch-btn" id="btn-trick">ФОРМА<br><small>L1</small></button>
+    <button class="touch-btn" id="btn-heal">ХИЛ<br><small>+HP</small></button>
+    <button class="touch-btn" id="btn-lock">ЦЕЛЬ</button>
+  </div>
+</div>
+
+<div id="banner-overlay">
+  <div id="banner-text">ВЫ ПОГИБЛИ</div>
+  <button class="btn-gothic" id="btn-restart">Возродиться у фонаря</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(() => {
+  // --- PROCEDURAL WEB AUDIO ENGINE ---
+  class SoundEngine {
+    constructor() { this.ctx = null; }
+    init() {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    }
+    playSlash(extended = false) {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(extended ? 210 : 340, now);
+      osc.frequency.exponentialRampToValueAtTime(52, now + (extended ? 0.28 : 0.18));
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + (extended ? 0.28 : 0.18));
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + (extended ? 0.29 : 0.19));
+    }
+    playGunshot() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const bufferSize = this.ctx.sampleRate * 0.35;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.08));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1150, now);
+      filter.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.55, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+      noise.start(now);
+    }
+    playParryChime() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      [523.25, 783.99, 1046.5].forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.03);
+        gain.gain.setValueAtTime(0.28, now + idx * 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.15);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now + idx * 0.03); osc.stop(now + 1.2);
+      });
+    }
+    playGateCreak() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(68, now);
+      osc.frequency.linearRampToValueAtTime(42, now + 1.1);
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.15);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 1.2);
+    }
+    playWoodSmash() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(38, now + 0.16);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.18);
+    }
+    playTransform() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(620, now);
+      osc.frequency.setValueAtTime(940, now + 0.07);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.19);
+    }
+    playHit(heavy = false) {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(heavy ? 110 : 165, now);
+      osc.frequency.exponentialRampToValueAtTime(32, now + 0.22);
+      gain.gain.setValueAtTime(heavy ? 0.35 : 0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.23);
+    }
+    playHeal() {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(280, now);
+      osc.frequency.exponentialRampToValueAtTime(560, now + 0.35);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+      osc.connect(gain); gain.connect(this.ctx.destination);
+      osc.start(now); osc.stop(now + 0.37);
+    }
+  }
+
+  const audio = new SoundEngine();
+  function vibrate(pattern) {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  }
+
+  // --- BACKGROUND MUSIC (hunter.mp3 лежит рядом с html) ---
+  const music = new Audio();
+  music.loop = true;
+  music.preload = 'auto';
+  music.volume = 0.55;
+  let musicOn = true;
+  const isPortrait = () => window.innerHeight > window.innerWidth;
+  function musicPlay() {
+    if (music.src && musicOn && !document.hidden && !isPortrait()) music.play().catch(() => {});
+  }
+  const btnMusic = document.getElementById('btn-music');
+  btnMusic.addEventListener('pointerdown', e => e.stopPropagation());
+  btnMusic.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+  btnMusic.addEventListener('click', () => {
+    musicOn = !musicOn;
+    btnMusic.classList.toggle('off', !musicOn);
+    if (musicOn) musicPlay(); else music.pause();
+  });
+  // Start button is locked until assets finish (or fail), so audio can start inside the tap gesture
+  const btnStart = document.getElementById('btn-start');
+  const musicStatus = document.getElementById('music-status');
+  let pendingAssets = 2;
+  function assetDone() {
+    if (--pendingAssets <= 0) enableStart();
+  }
+  function enableStart() {
+    pendingAssets = 0;
+    btnStart.disabled = false;
+    btnStart.textContent = 'Пробудиться в Ярнаме';
+  }
+  btnStart.disabled = true;
+  btnStart.textContent = 'Загрузка…';
+  setTimeout(enableStart, 30000);
+  fetch('hunter.mp3')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(b => { music.src = URL.createObjectURL(b); musicStatus.textContent = 'Музыка: готова'; })
+    .catch(e => { music.src = 'hunter.mp3'; musicStatus.textContent = 'Музыка: ' + e.message + ' — пробую напрямую'; })
+    .finally(assetDone);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) music.pause();
+    else if (state.started) musicPlay();
+  });
+
+  // --- THREE.JS SCENE SETUP ---
+  const canvas = document.getElementById('game-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.18;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x080a10);
+  scene.fog = new THREE.FogExp2(0x0b0e16, 0.024);
+
+  const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 210);
+
+  // Lighting
+  const hemiLight = new THREE.HemisphereLight(0x4d6285, 0x161214, 0.8);
+  scene.add(hemiLight);
+
+  const moonLight = new THREE.DirectionalLight(0x95b0e0, 1.4);
+  moonLight.position.set(-28, 52, -45);
+  moonLight.castShadow = true;
+  moonLight.shadow.mapSize.width = 2048;
+  moonLight.shadow.mapSize.height = 2048;
+  moonLight.shadow.camera.near = 5;
+  moonLight.shadow.camera.far = 170;
+  const d = 68;
+  moonLight.shadow.camera.left = -d;
+  moonLight.shadow.camera.right = d;
+  moonLight.shadow.camera.top = d;
+  moonLight.shadow.camera.bottom = -d;
+  moonLight.shadow.bias = -0.0005;
+  scene.add(moonLight);
+
+  // Pale Blood Moon & Cathedral Spires in Skyline
+  const moonMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(7.5, 24, 24),
+    new THREE.MeshBasicMaterial({ color: 0xe3ecfa, fog: false })
+  );
+  moonMesh.position.set(-48, 68, -145);
+  scene.add(moonMesh);
+
+  // --- MATERIALS ---
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x262930, roughness: 0.84, metalness: 0.15 });
+  const upperStoneMat = new THREE.MeshStandardMaterial({ color: 0x2f323b, roughness: 0.8, metalness: 0.18 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1b1d23, roughness: 0.92, metalness: 0.1 });
+  const ironMat = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.38, metalness: 0.88 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x3b2819, roughness: 0.88 });
+  const goldLeverMat = new THREE.MeshStandardMaterial({ color: 0xc99e48, roughness: 0.35, metalness: 0.85 });
+
+  // --- WORLD GEOMETRY & WALKABLE SURFACES ---
+  // Map layout (3x larger, non-linear with shortcut loop & elevation):
+  // 1. Lantern Courtyard (Start): X [-8..8], Z [12..26], Y=0
+  //    - West Gate (X: -8, Z: 19) -> Shortcut to Upper Shortcut Alley!
+  //    - North Gate (X: 0, Z: 12) -> Leads into Bonfire Plaza
+  // 2. Central Bonfire Plaza: X [-18..18], Z [-24..12], Y=0
+  //    - Central burning beast effigy bonfire at (0, 0, -6)
+  //    - East Staircase: X [12..17], Z [-16..-4], climbs from Y=0 to Y=3.6
+  //    - West Staircase: X [-17..-12], Z [-16..-4], climbs from Y=0 to Y=3.6
+  // 3. Upper Gallery & Overlook: Y=3.6
+  //    - East Walkway: X [11..18], Z [-32..-16], Y=3.6
+  //    - West Shortcut Balcony: X [-18..-11], Z [-24..-16], Y=3.6
+  //    - Hidden Secret Passage behind breakable crates at X [-15], Z [-16..19] (Y=3.6 -> ramps down to Y=0 at X [-15], Z [19])
+  //      leading right behind the West Shortcut Gate lever at X [-9.5], Z [19]!
+  //    - North Bridge Terrace: X [-18..18], Z [-36..-24], Y=3.6 -> connects to Great Bridge!
+  // 4. The Great Bridge (Boss Arena): X [-9..9], Z [-88..-36], Y=3.6
+  //    - Cleric Beast awaits at Z = -74, Y = 3.6
+
+  const walkZones = []; // { minX, maxX, minZ, maxZ, y0, y1, axis }
+  const colliders = []; // { minX, maxX, minZ, maxZ, minY, maxY, ref }
+  const breakables = [];
+  const gates = [];
+  const lanterns = [];
+
+  function addFloorBlock(x, y, z, w, h, d, mat = stoneMat) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y - h / 2, z);
+    m.receiveShadow = true;
+    m.castShadow = true;
+    scene.add(m);
+    return m;
+  }
+
+  function addBuilding(x, y, z, w, h, d, addCollider = true) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    m.position.set(x, y + h / 2, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    scene.add(m);
+
+    // Gothic roof trim
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.6, d + 0.5), ironMat);
+    roof.position.set(x, y + h + 0.3, z);
+    scene.add(roof);
+
+    if (addCollider) {
+      colliders.push({
+        minX: x - w / 2, maxX: x + w / 2,
+        minZ: z - d / 2, maxZ: z + d / 2,
+        minY: y, maxY: y + h
+      });
+    }
+  }
+
+  function addLantern(x, y, z, color = 0xff9436, intensity = 2.6, isCheckpoint = false) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.13, 3.2, 8), ironMat);
+    post.position.set(x, y + 1.6, z);
+    post.castShadow = true;
+    scene.add(post);
+
+    const bulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 10, 10),
+      new THREE.MeshBasicMaterial({ color })
+    );
+    bulb.position.set(x, y + 3.25, z);
+    scene.add(bulb);
+
+    const light = new THREE.PointLight(color, intensity, 18, 1.5);
+    light.position.set(x, y + 3.25, z);
+    scene.add(light);
+    lanterns.push({ light, baseIntensity: intensity, phase: Math.random() * 10, isCheckpoint, pos: new THREE.Vector3(x, y, z) });
+  }
+
+  // Build Floors & Walkable Zones
+  // 1. Lantern Courtyard (Start)
+  addFloorBlock(0, 0, 19, 18, 1, 14, stoneMat);
+  walkZones.push({ minX: -8.5, maxX: 8.5, minZ: 12, maxZ: 25.5, y0: 0, y1: 0, axis: 'none' });
+
+  // 2. Central Bonfire Plaza
+  addFloorBlock(0, 0, -6, 38, 1, 36, stoneMat);
+  walkZones.push({ minX: -18.2, maxX: 18.2, minZ: -24, maxZ: 12, y0: 0, y1: 0, axis: 'none' });
+
+  // 3. East & West Stone Staircases (Z from -4 down to -16, climbing Y=0 -> Y=3.6)
+  function buildStaircase(centerX, width, zStart, zEnd, yStart, yEnd) {
+    const steps = 14;
+    const dz = (zEnd - zStart) / steps;
+    const dy = (yEnd - yStart) / steps;
+    for (let i = 0; i < steps; i++) {
+      const sy = yStart + dy * (i + 1);
+      const sz = zStart + dz * (i + 0.5);
+      addFloorBlock(centerX, sy, sz, width, sy + 0.5, Math.abs(dz) + 0.08, upperStoneMat);
+      // Side walls for taller steps: stop the hunter from walking "through" the stairs from the side
+      const za = zStart + dz * i, zb = zStart + dz * (i + 1);
+      colliders.push({
+        minX: centerX - width / 2, maxX: centerX + width / 2,
+        minZ: Math.min(za, zb), maxZ: Math.max(za, zb),
+        minY: Math.min(yStart, yEnd), maxY: sy - 0.45
+      });
+    }
+    walkZones.push({
+      minX: centerX - width / 2,
+      maxX: centerX + width / 2,
+      minZ: Math.min(zStart, zEnd),
+      maxZ: Math.max(zStart, zEnd),
+      y0: yEnd, // at minZ (-16)
+      y1: yStart, // at maxZ (-4)
+      axis: 'z',
+      steps
+    });
+  }
+  buildStaircase(14.8, 5.4, -4, -16, 0, 3.6);
+  buildStaircase(-14.8, 5.4, -4, -16, 0, 3.6);
+
+  // 4. Upper Gallery Walkways & North Terrace (Y = 3.6)
+  addFloorBlock(14.8, 3.6, -20, 5.6, 4.1, 8, upperStoneMat);
+  walkZones.push({ minX: 12.0, maxX: 17.6, minZ: -24, maxZ: -16, y0: 3.6, y1: 3.6, axis: 'none' });
+
+  addFloorBlock(-14.8, 3.6, -20, 5.6, 4.1, 8, upperStoneMat);
+  walkZones.push({ minX: -17.6, maxX: -12.0, minZ: -24, maxZ: -16, y0: 3.6, y1: 3.6, axis: 'none' });
+
+  // North Terrace connecting East & West galleries before Great Bridge
+  addFloorBlock(0, 3.6, -30, 36, 4.1, 12, upperStoneMat);
+  walkZones.push({ minX: -17.6, maxX: 17.6, minZ: -36, maxZ: -24, y0: 3.6, y1: 3.6, axis: 'none' });
+
+  // 5. Secret Shortcut Alley (West side: behind breakable crates at Z=-16, goes South to Z=19, ramps down to Y=0!)
+  // Upper alley segment (Z: -16 to 4, Y = 3.6)
+  addFloorBlock(-14.8, 3.6, -6, 5.4, 4.1, 20, upperStoneMat);
+  walkZones.push({ minX: -17.4, maxX: -12.2, minZ: -16, maxZ: 4, y0: 3.6, y1: 3.6, axis: 'none' });
+
+  // Ramp/Stairs down to Shortcut Gate behind courtyard (Z: 4 to 14, Y: 3.6 -> 0)
+  buildStaircase(-14.8, 5.4, 14, 4, 0, 3.6);
+
+  // Lower Shortcut Landing behind West Courtyard Gate (X: -17.5..-8.5, Z: 14..23, Y = 0)
+  addFloorBlock(-13, 0, 18.5, 9, 1, 9, stoneMat);
+  walkZones.push({ minX: -17.4, maxX: -8.5, minZ: 14, maxZ: 23, y0: 0, y1: 0, axis: 'none' });
+
+  // 6. The Great Bridge (Boss Arena: X [-9.5..9.5], Z [-90..-36], Y = 3.6)
+  addFloorBlock(0, 3.6, -63, 19, 4.1, 54, upperStoneMat);
+  walkZones.push({ minX: -9.2, maxX: 9.2, minZ: -89.5, maxZ: -36, y0: 3.6, y1: 3.6, axis: 'none' });
+
+  // --- BUILDINGS, WALLS & BALUSTRADES ---
+  // Courtyard Perimeter
+  addBuilding(0, 0, 27.5, 22, 14, 3); // South wall behind spawn
+  addBuilding(10.5, 0, 19, 4, 14, 15); // East courtyard wall
+  addBuilding(-10.5, 0, 13.5, 4, 14, 3.5); // West courtyard north pillar
+  addBuilding(-10.5, 0, 24.5, 4, 14, 4.5); // West courtyard south pillar
+  // Gap at X = -9.5, Z = 16..22 is the SHORTCUT GATE!
+
+  // Dividing wall between Courtyard & Bonfire Plaza (Z = 12) with central archway
+  addBuilding(-11.5, 0, 12, 16, 14, 2.2);
+  addBuilding(11.5, 0, 12, 16, 14, 2.2);
+  // Arch top over Z=12
+  addBuilding(0, 5.2, 12, 8, 9, 2.2, false);
+
+  // Outer Plaza & Alley Buildings
+  addBuilding(20.5, 0, -10, 4, 18, 48); // East outer wall
+  addBuilding(-20.5, 0, -5, 4, 18, 58); // West outer wall
+  // Divider wall separating West Shortcut Alley from Main Plaza (X = -11.5, Z = -15..11)
+  addBuilding(-11.5, 0, -2, 1.4, 12, 26);
+
+  // Retaining wall under North Terrace (Z = -24, Y = 0..3.6)
+  const terraceWall = new THREE.Mesh(new THREE.BoxGeometry(24, 3.6, 1.5), wallMat);
+  terraceWall.position.set(0, 1.8, -24);
+  terraceWall.castShadow = true;
+  terraceWall.receiveShadow = true;
+  scene.add(terraceWall);
+  colliders.push({ minX: -12, maxX: 12, minZ: -24.8, maxZ: -23.2, minY: 0, maxY: 3.6 });
+
+  // Stone Balustrades on Upper Terrace (Z = -24, Y = 3.6)
+  const railGeo = new THREE.BoxGeometry(23, 1.05, 0.45);
+  const railMesh = new THREE.Mesh(railGeo, upperStoneMat);
+  railMesh.position.set(0, 4.12, -24.1);
+  railMesh.castShadow = true;
+  scene.add(railMesh);
+  colliders.push({ minX: -11.5, maxX: 11.5, minZ: -24.4, maxZ: -23.8, minY: 3.6, maxY: 4.8 });
+
+  // Great Bridge Parapets & Gothic Pillars
+  [-9.5, 9.5].forEach(bx => {
+    const parapet = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.3, 54), upperStoneMat);
+    parapet.position.set(bx, 4.25, -63);
+    parapet.castShadow = true;
+    scene.add(parapet);
+    colliders.push({ minX: bx - 0.5, maxX: bx + 0.5, minZ: -90, maxZ: -36, minY: 3.6, maxY: 5.5 });
+
+    for (let bz = -40; bz >= -85; bz -= 11) {
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 6.5, 8), wallMat);
+      spire.position.set(bx, 6.8, bz);
+      spire.castShadow = true;
+      scene.add(spire);
+      addLantern(bx + (bx < 0 ? 0.7 : -0.7), 3.6, bz, 0xff8822, 2.2);
+    }
+  });
+  // Cathedral End Wall at back of Great Bridge
+  addBuilding(0, 3.6, -91.5, 22, 22, 3);
+
+  // --- CENTRAL BONFIRE & COFFINS IN PLAZA ---
+  const bonfirePos = new THREE.Vector3(0, 0, -6);
+  const pyreBase = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.1, 0.9, 10), new THREE.MeshStandardMaterial({ color: 0x1a1412, roughness: 0.95 }));
+  pyreBase.position.set(0, 0.45, -6);
+  scene.add(pyreBase);
+  colliders.push({ minX: -1.8, maxX: 1.8, minZ: -7.8, maxZ: -4.2, minY: 0, maxY: 2.5 });
+
+  const fireCore = new THREE.Mesh(
+    new THREE.ConeGeometry(1.1, 2.6, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff6a1a })
+  );
+  fireCore.position.set(0, 1.8, -6);
+  scene.add(fireCore);
+
+  const bonfireLight = new THREE.PointLight(0xff6611, 4.5, 24, 1.4);
+  bonfireLight.position.set(0, 2.8, -6);
+  bonfireLight.castShadow = true;
+  scene.add(bonfireLight);
+  lanterns.push({ light: bonfireLight, baseIntensity: 4.5, phase: 0, isCheckpoint: false, pos: bonfirePos });
+
+  // Chained Coffins & Carriages for cover
+  [[-6, 3], [6.5, 1], [-6.5, -14], [5.5, -15]].forEach(([cx, cz]) => {
+    const coffin = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 2.5), woodMat);
+    coffin.position.set(cx, 0.5, cz);
+    coffin.rotation.y = (cx + cz) * 0.15;
+    coffin.castShadow = true;
+    coffin.receiveShadow = true;
+    scene.add(coffin);
+    colliders.push({ minX: cx - 0.8, maxX: cx + 0.8, minZ: cz - 1.2, maxZ: cz + 1.2, minY: 0, maxY: 1.2 });
+  });
+
+  // --- INTERACTIVE GATES & SHORTCUT LEVERS ---
+  function createGate(opts) {
+    const group = new THREE.Group();
+    group.position.set(opts.x, opts.y, opts.z);
+    group.rotation.y = opts.rotY || 0;
+    scene.add(group);
+
+    const doorW = opts.width || 4.8;
+    const doorH = 4.6;
+
+    const leftLeaf = new THREE.Group();
+    leftLeaf.position.set(-doorW / 2, 0, 0);
+    const leftBars = new THREE.Mesh(new THREE.BoxGeometry(doorW / 2, doorH, 0.22), ironMat);
+    leftBars.position.set(doorW / 4, doorH / 2, 0);
+    leftBars.castShadow = true;
+    leftLeaf.add(leftBars);
+    group.add(leftLeaf);
+
+    const rightLeaf = new THREE.Group();
+    rightLeaf.position.set(doorW / 2, 0, 0);
+    const rightBars = new THREE.Mesh(new THREE.BoxGeometry(doorW / 2, doorH, 0.22), ironMat);
+    rightBars.position.set(-doorW / 2 + doorW / 4, doorH / 2, 0);
+    rightBars.castShadow = true;
+    rightLeaf.add(rightBars);
+    group.add(rightLeaf);
+
+    // Lever mechanism
+    const leverGroup = new THREE.Group();
+    leverGroup.position.set(opts.leverX, opts.y, opts.leverZ);
+    scene.add(leverGroup);
+    const ped = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.0, 0.45), wallMat);
+    ped.position.y = 0.5;
+    leverGroup.add(ped);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.85, 8), goldLeverMat);
+    handle.position.y = 1.1;
+    handle.rotation.x = 0.45;
+    leverGroup.add(handle);
+
+    const col = opts.rotY
+      ? { minX: opts.x - 0.5, maxX: opts.x + 0.5, minZ: opts.z - doorW / 2, maxZ: opts.z + doorW / 2, minY: opts.y, maxY: opts.y + doorH }
+      : { minX: opts.x - doorW / 2, maxX: opts.x + doorW / 2, minZ: opts.z - 0.5, maxZ: opts.z + 0.5, minY: opts.y, maxY: opts.y + doorH };
+    colliders.push(col);
+
+    const gateObj = {
+      id: opts.id,
+      name: opts.name,
+      group,
+      leftLeaf,
+      rightLeaf,
+      handle,
+      open: false,
+      opening: false,
+      progress: 0,
+      collider: col,
+      doorPos: new THREE.Vector3(opts.x, opts.y, opts.z),
+      leverPos: new THREE.Vector3(opts.leverX, opts.y, opts.leverZ),
+      oneWaySide: opts.oneWaySide || null // e.g. 'west' means lever is on west side
+    };
+    gates.push(gateObj);
+    return gateObj;
+  }
+
+  // Gate 1: Courtyard Main Gate (X=0, Z=12) — opens directly from courtyard side
+  createGate({
+    id: 'courtyard_gate',
+    name: 'Ворота Центрального Ярнама',
+    x: 0, y: 0, z: 12, width: 6.4, rotY: 0,
+    leverX: 3.6, leverZ: 13.4
+  });
+
+  // Gate 2: THE CLASSIC BLOODBORNE SHORTCUT GATE (X=-9.2, Z=19)
+  // Locked from Courtyard side ("Не открывается с этой стороны"), lever is on X=-10.8 (Alley side)!
+  createGate({
+    id: 'shortcut_gate',
+    name: 'Кованые ворота (Шорткат к Фонарю)',
+    x: -9.2, y: 0, z: 19, width: 5.2, rotY: Math.PI / 2,
+    leverX: -10.8, leverZ: 16.5,
+    oneWaySide: 'west'
+  });
+
+  // Gate 3: Great Bridge Boss Gate (X=0, Z=-36, Y=3.6)
+  createGate({
+    id: 'bridge_gate',
+    name: 'Врата Большого Моста',
+    x: 0, y: 3.6, z: -36, width: 7.2, rotY: 0,
+    leverX: -4.4, leverZ: -34.5
+  });
+
+  // --- BREAKABLE WOODEN BARRELS / CRATES HIDING SECRET PASSAGE ---
+  function addBreakableCluster(cx, cy, cz, count = 6) {
+    for (let i = 0; i < count; i++) {
+      const bx = cx + ((i % 3) - 1) * 0.95;
+      const bz = cz + Math.floor(i / 3) * 0.95;
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 1.05, 8), woodMat);
+      mesh.position.set(bx, cy + 0.52, bz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      const col = { minX: bx - 0.45, maxX: bx + 0.45, minZ: bz - 0.45, maxZ: bz + 0.45, minY: cy, maxY: cy + 1.1 };
+      colliders.push(col);
+      breakables.push({ mesh, collider: col, broken: false, pos: new THREE.Vector3(bx, cy, bz) });
+    }
+  }
+  // Secret shortcut passage entrance on West Upper Gallery (X=-14.8, Y=3.6, Z=-16.5)
+  addBreakableCluster(-14.8, 3.6, -16.8, 6);
+  // Extra barrels around plaza
+  addBreakableCluster(11.5, 0, -2, 3);
+
+  // Additional Street Lanterns
+  addLantern(-3.2, 0, 22, 0x99ccff, 2.8, true); // Central Yharnam Lamp (Checkpoint)
+  addLantern(8.5, 0, 8, 0xff9436, 2.4);
+  addLantern(-8.5, 0, -10, 0xff9436, 2.4);
+  addLantern(14.8, 3.6, -22, 0xff9436, 2.5);
+  addLantern(-14.8, 3.6, -22, 0xff9436, 2.5);
+  addLantern(-14.8, 3.6, -4, 0xff8822, 2.2); // Inside secret shortcut alley
+  addLantern(-11.5, 0, 17, 0xff9436, 2.3); // By shortcut lever
+
+  // --- PARTICLES ---
+  const particles = [];
+  function spawnParticles(pos, colorHex, count = 14, speed = 5) {
+    const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+    const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.copy(pos);
+      m.position.y += 1.0;
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * speed,
+        Math.random() * speed * 0.8 + 1.6,
+        (Math.random() - 0.5) * speed
+      );
+      scene.add(m);
+      particles.push({ mesh: m, vel, life: 0.45 + Math.random() * 0.35 });
+    }
+  }
+
+  // --- HUNTER (DETAILED MULTI-PART MODEL) ---
+  const hunter = new THREE.Group();
+  hunter.position.set(0, 0, 22);
+  scene.add(hunter);
+
+  const coatMat = new THREE.MeshStandardMaterial({ color: 0x15161b, roughness: 0.72 });
+  const capeMat = new THREE.MeshStandardMaterial({ color: 0x1d1a21, roughness: 0.85, side: THREE.DoubleSide });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.46, 1.35, 10), coatMat);
+  torso.position.y = 0.85;
+  torso.castShadow = true;
+  hunter.add(torso);
+
+  // Flowing Hunter Shawl/Cape
+  const cape = new THREE.Mesh(new THREE.ConeGeometry(0.52, 1.05, 8, 1, true), capeMat);
+  cape.position.set(0, 1.02, -0.06);
+  hunter.add(cape);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), coatMat);
+  head.position.y = 1.68;
+  hunter.add(head);
+
+  // Tricorne Hat
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.04, 3), coatMat);
+  hatBrim.position.y = 1.82;
+  hunter.add(hatBrim);
+  const hatCrown = new THREE.Mesh(new THREE.ConeGeometry(0.21, 0.25, 6), coatMat);
+  hatCrown.position.y = 1.94;
+  hunter.add(hatCrown);
+
+  // Hip Lantern on Hunter
+  const hipLamp = new THREE.PointLight(0xffb469, 1.2, 7.5);
+  hipLamp.position.set(-0.32, 0.95, -0.2);
+  hunter.add(hipLamp);
+
+  // Right Hand: Saw Cleaver
+  const weaponPivot = new THREE.Group();
+  weaponPivot.position.set(0.38, 1.15, 0.1);
+  hunter.add(weaponPivot);
+
+  const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.58), woodMat);
+  handleMesh.position.z = 0.22;
+  weaponPivot.add(handleMesh);
+
+  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xa2abb5, metalness: 0.88, roughness: 0.22 });
+  const bladeMesh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.9), bladeMat);
+  bladeMesh.position.set(0, -0.05, 0.58);
+  bladeMesh.castShadow = true;
+  weaponPivot.add(bladeMesh);
+
+  // Left Hand: Blunderbuss
+  const gunPivot = new THREE.Group();
+  gunPivot.position.set(-0.38, 1.15, 0.15);
+  hunter.add(gunPivot);
+  const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.035, 0.58, 8), ironMat);
+  gunBarrel.rotation.x = Math.PI / 2;
+  gunBarrel.position.z = 0.28;
+  gunPivot.add(gunBarrel);
+
+  const muzzleLight = new THREE.PointLight(0xffaa33, 0, 9);
+  muzzleLight.position.set(0, 0, 0.68);
+  gunPivot.add(muzzleLight);
+
+  // --- HUNTER GLB MODEL (hunter.glb лежит рядом с html) ---
+  const HUNTER_HEIGHT = 1.95;
+  let modelFlip = new URLSearchParams(location.search).get('flip') === '1' ? Math.PI : 0;
+  const procParts = [torso, cape, head, hatBrim, hatCrown];
+  const hunterLean = new THREE.Group();
+  hunter.add(hunterLean);
+  const modelRoot = new THREE.Group();
+  hunterLean.add(modelRoot);
+  const blobShadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.6, 20),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false })
+  );
+  blobShadow.rotation.x = -Math.PI / 2;
+  blobShadow.position.y = 0.03;
+  blobShadow.visible = false;
+  hunter.add(blobShadow);
+  const loadStatus = document.getElementById('load-status');
+
+  function applyModelYaw() { modelRoot.rotation.y = Math.PI / 2 + modelFlip; }
+  window.addEventListener('keydown', e => {
+    if (e.code === 'KeyT') { modelFlip = modelFlip ? 0 : Math.PI; applyModelYaw(); }
+  });
+
+  const setModelStatus = t => { loadStatus.textContent = 'Модель охотника: ' + t; };
+  const loadScript = u => new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = u; s.onload = res; s.onerror = () => rej(new Error(u));
+    document.head.appendChild(s);
+  });
+  async function loadFirst(urls, ready) {
+    for (const u of urls) { if (ready()) return true; try { await loadScript(u); } catch (e) {} }
+    return ready();
+  }
+
+  (async function loadHunterModel() {
+    try {
+      const okLoader = await loadFirst([
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js',
+        'https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js'
+      ], () => !!THREE.GLTFLoader);
+      if (!okLoader) { setModelStatus('не загрузился GLTFLoader (нет интернета?) — запасная модель'); return; }
+      const okMeshopt = await loadFirst([
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js',
+        'https://unpkg.com/three@0.128.0/examples/js/libs/meshopt_decoder.js',
+        'https://cdn.jsdelivr.net/npm/three@0.137.0/examples/js/libs/meshopt_decoder.js',
+        'https://cdn.jsdelivr.net/npm/meshoptimizer@0.18.1/meshopt_decoder.js'
+      ], () => !!window.MeshoptDecoder);
+      if (!okMeshopt) { setModelStatus('не загрузился декодер meshopt — запасная модель'); return; }
+      try { await window.MeshoptDecoder.ready; } catch (e) {}
+
+      const head = await fetch('hunter.glb', { method: 'HEAD' }).catch(() => null);
+      if (!head || !head.ok) { setModelStatus('hunter.glb не найден' + (head ? ' (HTTP ' + head.status + ')' : '') + ' — запасная модель'); return; }
+
+      const gltf = await new Promise((res, rej) => {
+        const loader = new THREE.GLTFLoader();
+        loader.setMeshoptDecoder(window.MeshoptDecoder);
+        loader.load('hunter.glb', res, xhr => {
+          if (xhr && xhr.total) setModelStatus('загрузка ' + Math.round(xhr.loaded / xhr.total * 100) + '%');
+        }, err => rej(err));
+      });
+      const m = gltf.scene;
+      m.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = false;
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(mt => {
+          if (mt.metalness !== undefined) mt.metalness = Math.min(mt.metalness, 0.25);
+          ['map', 'emissiveMap'].forEach(k => { if (mt[k]) { mt[k].encoding = THREE.LinearEncoding; mt[k].needsUpdate = true; } });
+          mt.needsUpdate = true;
+        });
+      });
+      const box = new THREE.Box3().setFromObject(m);
+      const size = box.getSize(new THREE.Vector3());
+      const c = box.getCenter(new THREE.Vector3());
+      const k = HUNTER_HEIGHT / size.y;
+      m.scale.setScalar(k);
+      m.position.set(-c.x * k, -box.min.y * k, -c.z * k);
+      modelRoot.add(m);
+      applyModelYaw();
+      procParts.forEach(p => { p.visible = false; });
+      blobShadow.visible = true;
+      weaponPivot.position.set(0.55, 1.1, 0.1);
+      gunPivot.position.set(-0.55, 1.1, 0.15);
+      setModelStatus('готова');
+    } catch (err) {
+      setModelStatus('ошибка — ' + ((err && (err.message || err.type)) || 'не удалось прочитать файл') + ' — запасная модель');
+      console.error('hunter.glb', err);
+    } finally {
+      assetDone();
+    }
+  })();
+
+  // --- ENEMIES ---
+  const enemies = [];
+
+  function createEnemy(opts) {
+    const group = new THREE.Group();
+    group.position.set(opts.x, opts.y, opts.z);
+    scene.add(group);
+
+    const scale = opts.isBoss ? 2.1 : 1.05;
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: opts.isBoss ? 0x261a17 : 0x22252b,
+      roughness: 0.85
+    });
+
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.36 * scale, 0.48 * scale, 1.55 * scale, 10), bodyMat);
+    body.position.y = 0.85 * scale;
+    body.castShadow = true;
+    group.add(body);
+
+    const eHead = new THREE.Mesh(new THREE.SphereGeometry(0.24 * scale, 12, 12), bodyMat);
+    eHead.position.y = 1.74 * scale;
+    group.add(eHead);
+
+    // Boss Horns
+    if (opts.isBoss) {
+      [-0.22, 0.22].forEach(hx => {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.95, 6), new THREE.MeshStandardMaterial({ color: 0x3b3531 }));
+        horn.position.set(hx * scale, 2.05 * scale, 0.05);
+        horn.rotation.z = hx < 0 ? 0.45 : -0.45;
+        group.add(horn);
+      });
+    }
+
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05 * scale, 6, 6), eyeMat);
+    eyeL.position.set(-0.09 * scale, 1.76 * scale, 0.21 * scale);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.09 * scale;
+    group.add(eyeL, eyeR);
+
+    // Oversized Left Claw for Cleric Beast / Weapon for Huntsmen
+    const armPivot = new THREE.Group();
+    armPivot.position.set((opts.isBoss ? -0.52 : 0.44) * scale, 1.35 * scale, 0);
+    group.add(armPivot);
+    const claw = new THREE.Mesh(
+      new THREE.BoxGeometry((opts.isBoss ? 0.34 : 0.14) * scale, (opts.isBoss ? 0.34 : 0.14) * scale, 1.25 * scale),
+      new THREE.MeshStandardMaterial({ color: opts.isBoss ? 0x4d1515 : 0x777d85, metalness: 0.65, roughness: 0.35 })
+    );
+    claw.position.z = 0.6 * scale;
+    claw.castShadow = true;
+    armPivot.add(claw);
+
+    // Torch for torch huntsmen
+    if (opts.hasTorch) {
+      const torchLight = new THREE.PointLight(0xff7722, 2.0, 9);
+      torchLight.position.set(-0.45, 1.5, 0.4);
+      group.add(torchLight);
+    }
+
+    const lockRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.55 * scale, 0.7 * scale, 24),
+      new THREE.MeshBasicMaterial({ color: 0xf5d076, side: THREE.DoubleSide })
+    );
+    lockRing.rotation.x = -Math.PI / 2;
+    lockRing.position.y = 0.06;
+    lockRing.visible = false;
+    group.add(lockRing);
+
+    const enemyObj = {
+      group, armPivot, eyeMat, lockRing,
+      isBoss: !!opts.isBoss,
+      name: opts.name,
+      hp: opts.hp,
+      maxHp: opts.hp,
+      damage: opts.damage,
+      echoes: opts.echoes || 120,
+      aggroRange: opts.aggroRange,
+      attackRange: opts.attackRange,
+      speed: opts.speed,
+      state: 'idle',
+      timer: 0,
+      parryable: false,
+      hitApplied: false,
+      homePos: new THREE.Vector3(opts.x, opts.y, opts.z)
+    };
+    enemies.push(enemyObj);
+    return enemyObj;
+  }
+
+  // Plaza Patrols (Bonfire Area)
+  createEnemy({ x: -3.5, y: 0, z: 3, hp: 105, damage: 16, echoes: 90, aggroRange: 9.5, attackRange: 2.1, speed: 3.1, hasTorch: true, name: 'Горожанин с факелом' });
+  createEnemy({ x: 4.2, y: 0, z: -2, hp: 115, damage: 18, echoes: 100, aggroRange: 9.5, attackRange: 2.1, speed: 3.2, name: 'Охотник Ярнама' });
+  createEnemy({ x: -4.5, y: 0, z: -13, hp: 125, damage: 20, echoes: 110, aggroRange: 10, attackRange: 2.2, speed: 3.3, hasTorch: true, name: 'Патрульный площади' });
+  createEnemy({ x: 6.5, y: 0, z: -18, hp: 135, damage: 22, echoes: 130, aggroRange: 10, attackRange: 2.2, speed: 3.4, name: 'Громила с тесаком' });
+
+  // Upper Terrace Guard & Shortcut Alley Ambush
+  createEnemy({ x: 8.5, y: 3.6, z: -29, hp: 145, damage: 24, echoes: 160, aggroRange: 10.5, attackRange: 2.3, speed: 3.5, name: 'Страж террасы' });
+  createEnemy({ x: -14.8, y: 3.6, z: -8, hp: 140, damage: 23, echoes: 180, aggroRange: 9.0, attackRange: 2.2, speed: 3.6, name: 'Засадный охотник' });
+
+  // Great Bridge Wolf / Brute before Boss
+  createEnemy({ x: 0, y: 3.6, z: -48, hp: 190, damage: 26, echoes: 250, aggroRange: 11.5, attackRange: 2.5, speed: 4.1, name: 'Зверь-оборотень моста' });
+
+  // Boss: Cleric Beast on the Great Bridge
+  const boss = createEnemy({
+    x: 0, y: 3.6, z: -76, hp: 640, damage: 34, echoes: 4000,
+    aggroRange: 18.5, attackRange: 3.7, speed: 4.0,
+    isBoss: true, name: 'Церковное Чудовище'
+  });
+
+  // --- PLAYER STATE ---
+  const state = {
+    hp: 100, maxHp: 100,
+    rallyHp: 100, rallyTimer: 0,
+    stamina: 100, maxStamina: 100,
+    vials: 6, bullets: 12, echoes: 0,
+    extendedWeapon: false,
+    actionState: 'free',
+    actionTimer: 0,
+    dodgeDir: new THREE.Vector3(),
+    invulnTimer: 0,
+    lockedTarget: null,
+    camYaw: 0,
+    camPitch: 0.32,
+    hitApplied: false,
+    started: false,
+    currentZoneName: '',
+    activeInteractable: null
+  };
+
+  // --- UI ELEMENTS ---
+  const barHp = document.getElementById('bar-hp');
+  const barRally = document.getElementById('bar-rally');
+  const barStamina = document.getElementById('bar-stamina');
+  const vialsEl = document.getElementById('vials-count');
+  const bulletsEl = document.getElementById('bullets-count');
+  const echoesEl = document.getElementById('echoes-count');
+  const weaponLabel = document.getElementById('weapon-mode-label');
+  const zoneIndicator = document.getElementById('zone-indicator');
+  const locationToast = document.getElementById('location-toast');
+  const locationToastText = document.getElementById('location-toast-text');
+  const interactPrompt = document.getElementById('interact-prompt');
+  const bossHud = document.getElementById('boss-hud');
+  const bossHpFill = document.getElementById('boss-hp-fill');
+  const btnLock = document.getElementById('btn-lock');
+  const bannerOverlay = document.getElementById('banner-overlay');
+  const bannerText = document.getElementById('banner-text');
+
+  let toastTimeout = null;
+  function triggerZoneBanner(name) {
+    if (state.currentZoneName === name) return;
+    state.currentZoneName = name;
+    zoneIndicator.textContent = name;
+    locationToastText.textContent = name;
+    locationToast.style.opacity = '1';
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => { locationToast.style.opacity = '0'; }, 2600);
+  }
+
+  function updateHUD() {
+    barHp.style.width = `${Math.max(0, (state.hp / state.maxHp) * 100)}%`;
+    barRally.style.width = `${Math.max(0, (state.rallyHp / state.maxHp) * 100)}%`;
+    barStamina.style.width = `${Math.max(0, (state.stamina / state.maxStamina) * 100)}%`;
+    vialsEl.textContent = state.vials;
+    bulletsEl.textContent = state.bullets;
+    echoesEl.textContent = state.echoes;
+
+    if (boss.state !== 'dead' && hunter.position.z < -56) {
+      bossHud.style.display = 'block';
+      bossHpFill.style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
+    } else if (boss.state === 'dead') {
+      bossHud.style.display = 'none';
+    }
+  }
+
+  function showBanner(text, isVictory) {
+    bannerText.textContent = text;
+    bannerText.className = isVictory ? 'banner-victory' : 'banner-died';
+    bannerOverlay.style.display = 'flex';
+  }
+
+  // --- ELEVATION & COLLISION PHYSICS ---
+  function getFloorHeightAt(x, z, currentY) {
+    // Pick the HIGHEST reachable surface (step-up <= 0.6, drop <= 1.35).
+    // Previously the closest surface won, so overlapping flat plaza floor always beat the stairs.
+    let bestY = null;
+    for (const wz of walkZones) {
+      if (x < wz.minX || x > wz.maxX || z < wz.minZ || z > wz.maxZ) continue;
+      let y = wz.y0;
+      if (wz.axis === 'z') {
+        const t = (z - wz.minZ) / (wz.maxZ - wz.minZ);
+        if (wz.steps) {
+          const lo = Math.min(wz.y0, wz.y1), hi = Math.max(wz.y0, wz.y1);
+          const f = wz.y1 < wz.y0 ? 1 - t : t;
+          const i = Math.min(wz.steps - 1, Math.max(0, Math.floor(f * wz.steps)));
+          y = lo + (hi - lo) * (i + 1) / wz.steps;
+        } else {
+          y = wz.y0 + (wz.y1 - wz.y0) * t;
+        }
+      }
+      if (y - currentY > 0.6 || currentY - y > 1.35) continue;
+      if (bestY === null || y > bestY) bestY = y;
+    }
+    return bestY;
+  }
+
+  function canMoveTo(nx, ny, nz, radius = 0.52) {
+    const floorY = getFloorHeightAt(nx, nz, ny);
+    if (floorY === null) return null;
+
+    for (const c of colliders) {
+      if (c.disabled) continue;
+      if (floorY + 1.5 > c.minY && floorY + 0.15 < c.maxY) {
+        if (nx + radius > c.minX && nx - radius < c.maxX &&
+            nz + radius > c.minZ && nz - radius < c.maxZ) {
+          return null;
+        }
+      }
+    }
+    return floorY;
+  }
+
+  function moveEntityWithSlide(entity, dx, dz, radius = 0.52) {
+    const pos = entity.position;
+    // Try full move
+    let ny = canMoveTo(pos.x + dx, pos.y, pos.z + dz, radius);
+    if (ny !== null) {
+      pos.x += dx; pos.z += dz; pos.y = ny;
+      return;
+    }
+    // Slide X
+    ny = canMoveTo(pos.x + dx, pos.y, pos.z, radius);
+    if (ny !== null) {
+      pos.x += dx; pos.y = ny;
+      return;
+    }
+    // Slide Z
+    ny = canMoveTo(pos.x, pos.y, pos.z + dz, radius);
+    if (ny !== null) {
+      pos.z += dz; pos.y = ny;
+    }
+  }
+
+  // --- INTERACTION SYSTEM (GATES, SHORTCUTS, LAMP) ---
+  function checkInteractables() {
+    state.activeInteractable = null;
+    const p = hunter.position;
+
+    // 1. Central Yharnam Lamp (Checkpoint)
+    if (p.distanceTo(new THREE.Vector3(-3.2, 0, 22)) < 2.4) {
+      state.activeInteractable = {
+        label: 'Отдохнуть у Фонаря (Восстановить силы)',
+        action: () => {
+          state.hp = state.maxHp;
+          state.rallyHp = state.maxHp;
+          state.vials = 6;
+          state.bullets = 12;
+          audio.playParryChime();
+          vibrate(40);
+          spawnParticles(p, 0x99ccff, 22, 4);
+        }
+      };
+    }
+
+    // 2. Gates & Levers
+    for (const g of gates) {
+      if (g.open || g.opening) continue;
+      if (p.distanceTo(g.leverPos) < 2.2) {
+        state.activeInteractable = {
+          label: `Потянуть рычаг: ${g.name}`,
+          action: () => {
+            g.opening = true;
+            g.collider.disabled = true;
+            audio.playGateCreak();
+            vibrate([50, 40, 80]);
+          }
+        };
+        break;
+      }
+      if (g.oneWaySide === 'west' && p.distanceTo(g.doorPos) < 2.4 && p.x > g.doorPos.x) {
+        state.activeInteractable = {
+          label: 'Не открывается с этой стороны',
+          action: () => { vibrate(30); }
+        };
+        break;
+      }
+    }
+
+    if (state.activeInteractable) {
+      interactPrompt.textContent = state.activeInteractable.label;
+      interactPrompt.style.display = 'block';
+    } else {
+      interactPrompt.style.display = 'none';
+    }
+  }
+
+  interactPrompt.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (state.activeInteractable) state.activeInteractable.action();
+  }, { passive: false });
+  interactPrompt.addEventListener('click', () => {
+    if (state.activeInteractable) state.activeInteractable.action();
+  });
+
+  // --- COMBAT ACTIONS ---
+  function triggerAttack() {
+    if (!state.started || state.actionState !== 'free') return;
+
+    // Visceral Attack check
+    for (const e of enemies) {
+      if (e.state === 'staggered' && hunter.position.distanceTo(e.group.position) < (e.isBoss ? 4.0 : 2.7)) {
+        state.actionState = 'attack';
+        state.actionTimer = 0.42;
+        state.hitApplied = true;
+        audio.playParryChime();
+        audio.playHit(true);
+        vibrate([40, 30, 90]);
+        e.hp -= 185;
+        e.state = 'recovery';
+        e.timer = 0.85;
+        spawnParticles(e.group.position, 0xb80d1b, 34, 8);
+        if (state.rallyTimer > 0) state.hp = Math.min(state.rallyHp, state.hp + 38);
+        checkEnemyDeath(e);
+        return;
+      }
+    }
+
+    const cost = state.extendedWeapon ? 21 : 14;
+    if (state.stamina < cost) return;
+
+    state.stamina -= cost;
+    state.actionState = 'attack';
+    state.actionTimer = state.extendedWeapon ? 0.44 : 0.32;
+    state.hitApplied = false;
+    audio.playSlash(state.extendedWeapon);
+    vibrate(25);
+  }
+
+  function triggerGun() {
+    if (!state.started || state.actionState !== 'free' || state.bullets <= 0) return;
+    state.bullets--;
+    state.actionState = 'shoot';
+    state.actionTimer = 0.32;
+    muzzleLight.intensity = 5.5;
+    setTimeout(() => { muzzleLight.intensity = 0; }, 90);
+    audio.playGunshot();
+    vibrate([35, 20, 45]);
+
+    const forward = new THREE.Vector3(Math.sin(hunter.rotation.y), 0, Math.cos(hunter.rotation.y));
+    let parried = false;
+    for (const e of enemies) {
+      if (e.state === 'dead') continue;
+      if (Math.abs(e.group.position.y - hunter.position.y) > 2.2) continue;
+      const toEnemy = e.group.position.clone().sub(hunter.position);
+      toEnemy.y = 0;
+      const dist = toEnemy.length();
+      toEnemy.normalize();
+      if (dist < 11.5 && forward.dot(toEnemy) > 0.55) {
+        e.hp -= 15;
+        spawnParticles(e.group.position, 0xffaa44, 10, 4);
+        if (e.parryable) {
+          e.state = 'staggered';
+          e.timer = 2.6;
+          e.parryable = false;
+          parried = true;
+        }
+        checkEnemyDeath(e);
+      }
+    }
+    if (parried) {
+      audio.playParryChime();
+      vibrate([60, 40, 120]);
+    }
+  }
+
+  function triggerDodge(customDir = null) {
+    if (!state.started || state.actionState === 'dead' || state.actionState === 'dodge') return;
+    if (state.stamina < 15) return;
+
+    state.stamina -= 15;
+    state.actionState = 'dodge';
+    state.actionTimer = 0.30;
+    state.invulnTimer = 0.27;
+    vibrate(18);
+
+    if (customDir) {
+      state.dodgeDir.copy(customDir).normalize();
+    } else if (joyInput.lengthSq() > 0.05) {
+      state.dodgeDir.copy(getWorldMoveVector()).normalize();
+    } else {
+      state.dodgeDir.set(-Math.sin(hunter.rotation.y), 0, -Math.cos(hunter.rotation.y));
+    }
+  }
+
+  function triggerTransform() {
+    if (!state.started || state.actionState === 'dead') return;
+    state.extendedWeapon = !state.extendedWeapon;
+    bladeMesh.scale.z = state.extendedWeapon ? 1.68 : 1.0;
+    bladeMesh.position.z = state.extendedWeapon ? 0.88 : 0.58;
+    weaponLabel.textContent = state.extendedWeapon ? 'Пила-топор (Разложен)' : 'Пила-топор (Сложен)';
+    audio.playTransform();
+    vibrate([20, 25, 20]);
+  }
+
+  function triggerHeal() {
+    if (!state.started || state.actionState !== 'free' || state.vials <= 0 || state.hp >= state.maxHp) return;
+    state.vials--;
+    state.actionState = 'heal';
+    state.actionTimer = 0.36;
+    state.hp = Math.min(state.maxHp, state.hp + 48);
+    state.rallyHp = Math.max(state.rallyHp, state.hp);
+    audio.playHeal();
+    vibrate(30);
+    spawnParticles(hunter.position, 0xd92638, 16, 3.5);
+  }
+
+  function toggleLockOn() {
+    if (state.lockedTarget) {
+      state.lockedTarget.lockRing.visible = false;
+      state.lockedTarget = null;
+      btnLock.classList.remove('locked');
+      return;
+    }
+    let nearest = null;
+    let bestDist = 19;
+    for (const e of enemies) {
+      if (e.state === 'dead') continue;
+      if (Math.abs(e.group.position.y - hunter.position.y) > 2.2) continue;
+      const d = hunter.position.distanceTo(e.group.position);
+      if (d < bestDist) {
+        bestDist = d;
+        nearest = e;
+      }
+    }
+    if (nearest) {
+      state.lockedTarget = nearest;
+      nearest.lockRing.visible = true;
+      btnLock.classList.add('locked');
+      vibrate(20);
+    }
+  }
+
+  function checkEnemyDeath(e) {
+    if (e.hp <= 0 && e.state !== 'dead') {
+      e.state = 'dead';
+      e.lockRing.visible = false;
+      state.echoes += e.echoes;
+      if (state.lockedTarget === e) {
+        state.lockedTarget = null;
+        btnLock.classList.remove('locked');
+      }
+      spawnParticles(e.group.position, 0x9e0b16, 36, 7);
+      e.group.rotation.x = Math.PI / 2;
+      e.group.position.y += 0.25;
+      if (e.isBoss) {
+        audio.playParryChime();
+        setTimeout(() => showBanner('ДОБЫЧА ПОВЕРЖЕНА', true), 750);
+      }
+    }
+  }
+
+  function damagePlayer(amount) {
+    if (state.invulnTimer > 0 || state.actionState === 'dead') return;
+    state.rallyHp = Math.max(state.rallyHp, state.hp);
+    state.rallyTimer = 4.2;
+    state.hp = Math.max(0, state.hp - amount);
+    state.invulnTimer = 0.45;
+    audio.playHit(true);
+    vibrate([80, 40, 100]);
+    spawnParticles(hunter.position, 0xb80d1b, 22, 6);
+
+    if (state.hp <= 0) {
+      state.actionState = 'dead';
+      hunter.rotation.x = -Math.PI / 2;
+      hunter.position.y += 0.2;
+      music.volume = 0.25;
+      setTimeout(() => showBanner('ВЫ ПОГИБЛИ', false), 600);
+    }
+  }
+
+  // --- TOUCH JOYSTICK & CAMERA SWIPE ---
+  const joyZone = document.getElementById('touch-joystick-zone');
+  const joyKnob = document.getElementById('joystick-knob');
+  const camZone = document.getElementById('camera-swipe-zone');
+  const joyInput = new THREE.Vector2(0, 0);
+  let joyTouchId = null, camTouchId = null, lastCamX = 0, lastCamY = 0;
+
+  joyZone.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    joyTouchId = t.identifier;
+    updateJoystick(t);
+  }, { passive: false });
+
+  joyZone.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyTouchId) updateJoystick(t);
+    }
+  }, { passive: false });
+
+  const resetJoystick = (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyTouchId) {
+        joyTouchId = null;
+        joyInput.set(0, 0);
+        joyKnob.style.transform = 'translate(0px, 0px)';
+      }
+    }
+  };
+  joyZone.addEventListener('touchend', resetJoystick);
+  joyZone.addEventListener('touchcancel', resetJoystick);
+
+  function updateJoystick(touch) {
+    const rect = joyZone.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const maxR = 40;
+    let dx = touch.clientX - cx;
+    let dy = touch.clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxR) { dx = (dx / dist) * maxR; dy = (dy / dist) * maxR; }
+    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    joyInput.set(dx / maxR, dy / maxR);
+  }
+
+  let swipeStartX = 0, swipeStartY = 0, swipeStartTime = 0;
+  camZone.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0];
+    camTouchId = t.identifier;
+    lastCamX = swipeStartX = t.clientX;
+    lastCamY = swipeStartY = t.clientY;
+    swipeStartTime = performance.now();
+  }, { passive: true });
+
+  camZone.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === camTouchId) {
+        const dx = t.clientX - lastCamX;
+        const dy = t.clientY - lastCamY;
+        if (!state.lockedTarget) state.camYaw -= dx * 0.0065;
+        state.camPitch = Math.max(0.12, Math.min(0.75, state.camPitch + dy * 0.004));
+        lastCamX = t.clientX;
+        lastCamY = t.clientY;
+      }
+    }
+  }, { passive: true });
+
+  camZone.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === camTouchId) {
+        const dt = performance.now() - swipeStartTime;
+        const dx = t.clientX - swipeStartX;
+        const dy = t.clientY - swipeStartY;
+        if (dt < 210 && Math.hypot(dx, dy) > 48) {
+          const right = new THREE.Vector3(Math.cos(state.camYaw), 0, -Math.sin(state.camYaw));
+          const fwd = new THREE.Vector3(-Math.sin(state.camYaw), 0, -Math.cos(state.camYaw));
+          const dir = right.multiplyScalar(dx).add(fwd.multiplyScalar(-dy));
+          triggerDodge(dir);
+        } else if (dt < 180 && Math.hypot(dx, dy) < 12) {
+          triggerAttack();
+        }
+        camTouchId = null;
+      }
+    }
+  });
+
+  function bindBtn(id, fn) {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); fn(); }, { passive: false });
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); fn(); });
+  }
+  bindBtn('btn-attack', triggerAttack);
+  bindBtn('btn-dodge', () => triggerDodge());
+  bindBtn('btn-gun', triggerGun);
+  bindBtn('btn-trick', triggerTransform);
+  bindBtn('btn-heal', triggerHeal);
+  bindBtn('btn-lock', toggleLockOn);
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'KeyJ' || e.code === 'Space') triggerAttack();
+    if (e.code === 'KeyK' || e.code === 'ShiftLeft') triggerDodge();
+    if (e.code === 'KeyL') triggerGun();
+    if (e.code === 'KeyR') triggerTransform();
+    if (e.code === 'KeyV') triggerHeal();
+    if (e.code === 'KeyQ') toggleLockOn();
+    if (e.code === 'KeyE' && state.activeInteractable) state.activeInteractable.action();
+  });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  function getWorldMoveVector() {
+    let ix = joyInput.x, iy = joyInput.y;
+    if (keys['KeyA']) ix -= 1;
+    if (keys['KeyD']) ix += 1;
+    if (keys['KeyW']) iy -= 1;
+    if (keys['KeyS']) iy += 1;
+    const vec = new THREE.Vector3(ix, 0, iy);
+    if (vec.lengthSq() > 1) vec.normalize();
+    vec.applyAxisAngle(new THREE.Vector3(0, 1, 0), state.camYaw);
+    return vec;
+  }
+
+  // --- FORCED LANDSCAPE ---
+  function lockLandscape() {
+    const el = document.documentElement;
+    const fs = el.requestFullscreen || el.webkitRequestFullscreen;
+    const lock = () => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); };
+    if (fs && !document.fullscreenElement) {
+      Promise.resolve(fs.call(el)).then(lock, lock);
+    } else lock();
+  }
+  document.addEventListener('pointerdown', () => { if (state.started && isPortrait()) lockLandscape(); });
+
+  // --- START & RESTART ---
+  document.getElementById('btn-start').addEventListener('click', () => {
+    audio.init();
+    musicPlay();
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    state.started = true;
+    lockLandscape();
+    triggerZoneBanner('ЦЕНТРАЛЬНЫЙ ЯРНАМ');
+  });
+
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    state.hp = state.maxHp;
+    state.rallyHp = state.maxHp;
+    state.stamina = state.maxStamina;
+    state.vials = 6;
+    state.bullets = 12;
+    state.echoes = 0;
+    state.actionState = 'free';
+    state.lockedTarget = null;
+    btnLock.classList.remove('locked');
+    hunter.position.set(0, 0, 22);
+    hunter.rotation.set(0, 0, 0);
+    music.volume = 0.55;
+    state.camYaw = 0;
+
+    // Note: Opened shortcuts stay open on respawn, just like in Bloodborne!
+    enemies.forEach(e => {
+      e.hp = e.maxHp;
+      e.state = 'idle';
+      e.parryable = false;
+      e.lockRing.visible = false;
+      e.group.position.copy(e.homePos);
+      e.group.rotation.set(0, 0, 0);
+    });
+    bannerOverlay.style.display = 'none';
+  });
+
+  // --- ZONE DETECTION ---
+  function updateCurrentZone() {
+    const p = hunter.position;
+    if (p.z < -36) triggerZoneBanner('БОЛЬШОЙ МОСТ');
+    else if (p.x < -11.5 && p.z > -16 && p.z < 14) triggerZoneBanner('ПОТАЙНОЙ ПЕРЕУЛОК (ШОРТКАТ)');
+    else if (p.y > 2.5) triggerZoneBanner('ВЕРХНЯЯ ГАЛЕРЕЯ ЯРНАМА');
+    else if (p.z < 12) triggerZoneBanner('ПЛОЩАДЬ С КОСТРОМ');
+    else triggerZoneBanner('ДВОР ФОНАРЯ ЦЕНТРАЛЬНОГО ЯРНАМА');
+  }
+
+  // --- MAIN GAME LOOP ---
+  let lastTime = performance.now();
+  let portraitPaused = false;
+  const lastHunterPos = new THREE.Vector3().copy(hunter.position);
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    if (isPortrait()) {
+      if (!music.paused) music.pause();
+      portraitPaused = true;
+      return;
+    }
+    if (portraitPaused) { portraitPaused = false; if (state.started) musicPlay(); }
+
+    // Animate lanterns & bonfire
+    lanterns.forEach(l => {
+      l.light.intensity = l.baseIntensity + Math.sin(now * 0.008 + l.phase) * 0.4;
+    });
+    fireCore.scale.y = 0.92 + Math.sin(now * 0.015) * 0.14;
+
+    // Animate opening gates
+    gates.forEach(g => {
+      if (g.opening && !g.open) {
+        g.progress = Math.min(1, g.progress + dt * 0.85);
+        g.leftLeaf.rotation.y = -g.progress * (Math.PI * 0.48);
+        g.rightLeaf.rotation.y = g.progress * (Math.PI * 0.48);
+        g.handle.rotation.x = 0.45 - g.progress * 0.9;
+        if (g.progress >= 1) {
+          g.open = true;
+          g.opening = false;
+        }
+      }
+    });
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      p.vel.y -= 14 * dt;
+      p.mesh.position.addScaledVector(p.vel, dt);
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        particles.splice(i, 1);
+      }
+    }
+
+    if (state.started && state.actionState !== 'dead') {
+      if (state.invulnTimer > 0) state.invulnTimer -= dt;
+      if (state.rallyTimer > 0) {
+        state.rallyTimer -= dt;
+        if (state.rallyTimer <= 0) state.rallyHp = state.hp;
+      }
+      if (state.actionState === 'free') {
+        state.stamina = Math.min(state.maxStamina, state.stamina + 28 * dt);
+      }
+
+      if (state.lockedTarget && state.lockedTarget.state === 'dead') {
+        state.lockedTarget.lockRing.visible = false;
+        state.lockedTarget = null;
+        btnLock.classList.remove('locked');
+      }
+
+      const moveVec = getWorldMoveVector();
+      if (state.actionState === 'free') {
+        if (moveVec.lengthSq() > 0.001) {
+          moveEntityWithSlide(hunter, moveVec.x * 5.6 * dt, moveVec.z * 5.6 * dt, 0.5);
+          if (!state.lockedTarget) {
+            hunter.rotation.y = Math.atan2(moveVec.x, moveVec.z);
+          }
+        }
+        if (state.lockedTarget) {
+          const toTarget = state.lockedTarget.group.position.clone().sub(hunter.position);
+          hunter.rotation.y = Math.atan2(toTarget.x, toTarget.z);
+          state.camYaw = Math.atan2(-toTarget.x, -toTarget.z);
+        }
+        weaponPivot.rotation.set(0.3, 0, 0);
+      } else if (state.actionState === 'dodge') {
+        state.actionTimer -= dt;
+        moveEntityWithSlide(hunter, state.dodgeDir.x * 14.0 * dt, state.dodgeDir.z * 14.0 * dt, 0.45);
+        if (state.actionTimer <= 0) state.actionState = 'free';
+      } else if (state.actionState === 'attack') {
+        state.actionTimer -= dt;
+        const swingProgress = 1 - (state.actionTimer / (state.extendedWeapon ? 0.44 : 0.32));
+        weaponPivot.rotation.y = Math.sin(swingProgress * Math.PI) * 2.2 - 0.8;
+        weaponPivot.rotation.x = 0.8;
+
+        if (!state.hitApplied && swingProgress > 0.32) {
+          state.hitApplied = true;
+          const reach = state.extendedWeapon ? 3.6 : 2.45;
+          const dmg = state.extendedWeapon ? 46 : 32;
+          const forward = new THREE.Vector3(Math.sin(hunter.rotation.y), 0, Math.cos(hunter.rotation.y));
+
+          // Smash breakable barrels / crates!
+          for (const b of breakables) {
+            if (b.broken) continue;
+            if (Math.abs(b.pos.y - hunter.position.y) < 1.8 && b.pos.distanceTo(hunter.position) <= reach + 0.5) {
+              b.broken = true;
+              b.mesh.visible = false;
+              b.collider.disabled = true;
+              audio.playWoodSmash();
+              vibrate(25);
+              spawnParticles(b.pos, 0x5c3d24, 14, 5);
+            }
+          }
+
+          // Hit enemies
+          for (const e of enemies) {
+            if (e.state === 'dead') continue;
+            if (Math.abs(e.group.position.y - hunter.position.y) > 2.2) continue;
+            const toE = e.group.position.clone().sub(hunter.position);
+            toE.y = 0;
+            const dist = toE.length();
+            toE.normalize();
+            if (dist <= reach && forward.dot(toE) > 0.22) {
+              e.hp -= dmg;
+              audio.playHit(state.extendedWeapon);
+              vibrate(35);
+              spawnParticles(e.group.position, 0xb80d1b, 18, 5.5);
+              if (state.rallyTimer > 0) {
+                state.hp = Math.min(state.rallyHp, state.hp + (state.extendedWeapon ? 18 : 13));
+              }
+              checkEnemyDeath(e);
+            }
+          }
+        }
+        if (state.actionTimer <= 0) {
+          state.actionState = 'free';
+          weaponPivot.rotation.set(0.3, 0, 0);
+        }
+      } else if (state.actionState === 'shoot' || state.actionState === 'heal') {
+        state.actionTimer -= dt;
+        if (state.actionTimer <= 0) state.actionState = 'free';
+      }
+
+      checkInteractables();
+      updateCurrentZone();
+
+      // Update Enemies AI
+      for (const e of enemies) {
+        if (e.state === 'dead') continue;
+        if (Math.abs(e.group.position.y - hunter.position.y) > 2.4) continue;
+
+        const toPlayer = hunter.position.clone().sub(e.group.position);
+        toPlayer.y = 0;
+        const dist = toPlayer.length();
+
+        if (e.state === 'staggered') {
+          e.timer -= dt;
+          e.group.rotation.x = 0.38;
+          e.eyeMat.color.setHex(0xffd700);
+          if (e.timer <= 0) {
+            e.state = 'chase';
+            e.group.rotation.x = 0;
+            e.eyeMat.color.setHex(0xff2222);
+          }
+          continue;
+        }
+
+        if (e.state === 'idle') {
+          if (dist < e.aggroRange) {
+            e.state = 'chase';
+            if (e.isBoss && !state.lockedTarget) toggleLockOn();
+          }
+        } else if (e.state === 'chase') {
+          e.group.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+          if (dist > e.attackRange * 0.85) {
+            toPlayer.normalize();
+            moveEntityWithSlide(e.group, toPlayer.x * e.speed * dt, toPlayer.z * e.speed * dt, e.isBoss ? 1.1 : 0.55);
+          } else {
+            e.state = 'windup';
+            e.timer = e.isBoss ? 0.72 : 0.62;
+            e.parryable = true;
+            e.hitApplied = false;
+          }
+        } else if (e.state === 'windup') {
+          e.timer -= dt;
+          e.group.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+          e.armPivot.rotation.x = -1.35;
+          e.eyeMat.color.setHex(0xffffff);
+          if (e.timer <= 0) {
+            e.state = 'strike';
+            e.timer = 0.25;
+            e.parryable = false;
+            e.eyeMat.color.setHex(0xff2222);
+          }
+        } else if (e.state === 'strike') {
+          e.timer -= dt;
+          e.armPivot.rotation.x = 0.85;
+          if (!e.hitApplied && dist <= e.attackRange + 0.45) {
+            e.hitApplied = true;
+            damagePlayer(e.damage);
+          }
+          if (e.timer <= 0) {
+            e.state = 'recovery';
+            e.timer = e.isBoss ? 0.85 : 0.75;
+            e.armPivot.rotation.x = 0;
+          }
+        } else if (e.state === 'recovery') {
+          e.timer -= dt;
+          if (e.timer <= 0) e.state = 'chase';
+        }
+      }
+    }
+
+    // Smooth Third-Person Camera
+    const camDist = state.lockedTarget ? 6.5 : 5.5;
+    const camOffset = new THREE.Vector3(
+      Math.sin(state.camYaw) * camDist,
+      2.6 + state.camPitch * 2.5,
+      Math.cos(state.camYaw) * camDist
+    );
+    const desiredCamPos = hunter.position.clone().add(camOffset);
+    camera.position.lerp(desiredCamPos, 10 * dt);
+
+    const lookTarget = hunter.position.clone().add(new THREE.Vector3(0, 1.35, 0));
+    if (state.lockedTarget) {
+      lookTarget.lerp(state.lockedTarget.group.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0.42);
+    }
+    camera.lookAt(lookTarget);
+
+    // Procedural motion for the static hunter model
+    const hSpeed = hunter.position.distanceTo(lastHunterPos) / Math.max(dt, 0.001);
+    lastHunterPos.copy(hunter.position);
+    let leanX = 0, bob = 0;
+    if (state.actionState === 'dodge') leanX = 0.45;
+    else if (state.actionState === 'attack') leanX = 0.18;
+    else if (hSpeed > 0.5) { leanX = 0.08; bob = Math.abs(Math.sin(now * 0.011)) * 0.06; }
+    hunterLean.rotation.x += (leanX - hunterLean.rotation.x) * Math.min(1, 14 * dt);
+    hunterLean.position.y += (bob - hunterLean.position.y) * Math.min(1, 20 * dt);
+
+    updateHUD();
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
