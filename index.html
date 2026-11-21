@@ -1243,6 +1243,8 @@
     const group = new THREE.Group();
     group.position.set(opts.x, opts.y, opts.z);
     scene.add(group);
+    const procedural = new THREE.Group();
+    group.add(procedural);
 
     const scale = opts.isBoss ? 2.1 : 1.05;
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -1253,11 +1255,11 @@
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.36 * scale, 0.48 * scale, 1.55 * scale, 10), bodyMat);
     body.position.y = 0.85 * scale;
     body.castShadow = true;
-    group.add(body);
+    procedural.add(body);
 
     const eHead = new THREE.Mesh(new THREE.SphereGeometry(0.24 * scale, 12, 12), bodyMat);
     eHead.position.y = 1.74 * scale;
-    group.add(eHead);
+    procedural.add(eHead);
 
     // Boss Horns
     if (opts.isBoss) {
@@ -1265,7 +1267,7 @@
         const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.95, 6), new THREE.MeshStandardMaterial({ color: 0x3b3531 }));
         horn.position.set(hx * scale, 2.05 * scale, 0.05);
         horn.rotation.z = hx < 0 ? 0.45 : -0.45;
-        group.add(horn);
+        procedural.add(horn);
       });
     }
 
@@ -1274,12 +1276,12 @@
     eyeL.position.set(-0.09 * scale, 1.76 * scale, 0.21 * scale);
     const eyeR = eyeL.clone();
     eyeR.position.x = 0.09 * scale;
-    group.add(eyeL, eyeR);
+    procedural.add(eyeL, eyeR);
 
     // Oversized Left Claw for Cleric Beast / Weapon for Huntsmen
     const armPivot = new THREE.Group();
     armPivot.position.set((opts.isBoss ? -0.52 : 0.44) * scale, 1.35 * scale, 0);
-    group.add(armPivot);
+    procedural.add(armPivot);
     const claw = new THREE.Mesh(
       new THREE.BoxGeometry((opts.isBoss ? 0.34 : 0.14) * scale, (opts.isBoss ? 0.34 : 0.14) * scale, 1.25 * scale),
       new THREE.MeshStandardMaterial({ color: opts.isBoss ? 0x4d1515 : 0x777d85, metalness: 0.65, roughness: 0.35 })
@@ -1305,7 +1307,7 @@
     group.add(lockRing);
 
     const enemyObj = {
-      group, armPivot, eyeMat, lockRing,
+      group, procedural, armPivot, eyeMat, lockRing,
       isBoss: !!opts.isBoss,
       name: opts.name,
       hp: opts.hp,
@@ -1322,27 +1324,52 @@
       homePos: new THREE.Vector3(opts.x, opts.y, opts.z)
     };
     enemies.push(enemyObj);
+    if (opts.modelFile) loadEnemyModel(enemyObj, opts.modelFile);
     return enemyObj;
   }
 
+  const enemyModelCache = new Map();
+  function loadEnemyModel(enemy, file) {
+    if (!enemyModelCache.has(file)) {
+      enemyModelCache.set(file, new Promise((resolve, reject) => {
+        if (!THREE.GLTFLoader) { reject(new Error('GLTFLoader недоступен')); return; }
+        new THREE.GLTFLoader().load(file, gltf => resolve(gltf.scene), undefined, reject);
+      }));
+    }
+    enemyModelCache.get(file).then(source => {
+      if (!enemy.group.parent) return;
+      const model = source.clone(true);
+      model.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const targetHeight = enemy.isBoss ? 5.2 : 2.0;
+      const scale = targetHeight / Math.max(size.y, size.x, size.z);
+      model.scale.setScalar(scale);
+      model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+      enemy.group.add(model);
+      enemy.procedural.visible = false;
+    }).catch(err => console.warn('Не удалось загрузить модель врага ' + file, err));
+  }
+
   // Plaza Patrols (Bonfire Area)
-  createEnemy({ x: -3.5, y: 0, z: 3, hp: 105, damage: 16, echoes: 90, aggroRange: 9.5, attackRange: 2.1, speed: 3.1, hasTorch: true, name: 'Горожанин с факелом' });
-  createEnemy({ x: 4.2, y: 0, z: -2, hp: 115, damage: 18, echoes: 100, aggroRange: 9.5, attackRange: 2.1, speed: 3.2, name: 'Охотник Ярнама' });
-  createEnemy({ x: -4.5, y: 0, z: -13, hp: 125, damage: 20, echoes: 110, aggroRange: 10, attackRange: 2.2, speed: 3.3, hasTorch: true, name: 'Патрульный площади' });
-  createEnemy({ x: 6.5, y: 0, z: -18, hp: 135, damage: 22, echoes: 130, aggroRange: 10, attackRange: 2.2, speed: 3.4, name: 'Громила с тесаком' });
+  createEnemy({ x: -3.5, y: 0, z: 3, hp: 105, damage: 16, echoes: 90, aggroRange: 9.5, attackRange: 2.1, speed: 3.1, hasTorch: true, name: 'Горожанин с факелом', modelFile: 'Spider_Model.glb' });
+  createEnemy({ x: 4.2, y: 0, z: -2, hp: 115, damage: 18, echoes: 100, aggroRange: 9.5, attackRange: 2.1, speed: 3.2, name: 'Охотник Ярнама', modelFile: 'spider.glb' });
+  createEnemy({ x: -4.5, y: 0, z: -13, hp: 125, damage: 20, echoes: 110, aggroRange: 10, attackRange: 2.2, speed: 3.3, hasTorch: true, name: 'Патрульный площади', modelFile: 'Spider_Model.glb' });
+  createEnemy({ x: 6.5, y: 0, z: -18, hp: 135, damage: 22, echoes: 130, aggroRange: 10, attackRange: 2.2, speed: 3.4, name: 'Громила с тесаком', modelFile: 'spider.glb' });
 
   // Upper Terrace Guard & Shortcut Alley Ambush
-  createEnemy({ x: 8.5, y: 3.6, z: -29, hp: 145, damage: 24, echoes: 160, aggroRange: 10.5, attackRange: 2.3, speed: 3.5, name: 'Страж террасы' });
-  createEnemy({ x: -14.8, y: 3.6, z: -8, hp: 140, damage: 23, echoes: 180, aggroRange: 9.0, attackRange: 2.2, speed: 3.6, name: 'Засадный охотник' });
+  createEnemy({ x: 8.5, y: 3.6, z: -29, hp: 145, damage: 24, aggroRange: 10.5, attackRange: 2.3, speed: 3.5, name: 'Страж террасы', modelFile: 'spider.glb' });
+  createEnemy({ x: -14.8, y: 3.6, z: -8, hp: 140, damage: 23, aggroRange: 9.0, attackRange: 2.2, speed: 3.6, name: 'Засадный охотник', modelFile: 'Spider_Model.glb' });
 
   // Great Bridge Wolf / Brute before Boss
-  createEnemy({ x: 0, y: 3.6, z: -48, hp: 190, damage: 26, echoes: 250, aggroRange: 11.5, attackRange: 2.5, speed: 4.1, name: 'Зверь-оборотень моста' });
+  createEnemy({ x: 0, y: 3.6, z: -48, hp: 190, damage: 26, echoes: 250, aggroRange: 11.5, attackRange: 2.5, speed: 4.1, name: 'Зверь-оборотень моста', modelFile: 'spider1.glb' });
 
   // Boss: Cleric Beast on the Great Bridge
   const boss = createEnemy({
     x: 0, y: 3.6, z: -76, hp: 640, damage: 34, echoes: 4000,
     aggroRange: 18.5, attackRange: 3.7, speed: 4.0,
-    isBoss: true, name: 'Церковное Чудовище'
+    isBoss: true, name: 'Церковное Чудовище', modelFile: 'spider1.glb'
   });
 
   // --- PLAYER STATE ---
